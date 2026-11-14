@@ -1,4 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {
   View,
   Text,
@@ -8,11 +14,17 @@ import {
   TextInput,
   StatusBar,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 const Stack = createNativeStackNavigator();
+const AppContext = createContext(null);
+
+function useAppData() {
+  return useContext(AppContext);
+}
 
 const parkingData = [
   {
@@ -21,7 +33,6 @@ const parkingData = [
     location: 'Colombo 03',
     price: 150,
     available: 24,
-    total: 60,
     distance: '0.8 km',
     color: '#2563EB',
   },
@@ -31,7 +42,6 @@ const parkingData = [
     location: 'Colombo 03',
     price: 200,
     available: 12,
-    total: 40,
     distance: '1.2 km',
     color: '#7C3AED',
   },
@@ -41,29 +51,22 @@ const parkingData = [
     location: 'Colombo 01',
     price: 100,
     available: 31,
-    total: 80,
     distance: '2.1 km',
     color: '#059669',
   },
 ];
 
 function HomeScreen({ navigation }) {
+  const { bookings, favourites } = useAppData();
+
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.homeContent}>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <StatusBar barStyle="light-content" />
 
       <View style={styles.hero}>
-        <View style={styles.heroTop}>
-          <View>
-            <Text style={styles.welcome}>WELCOME BACK</Text>
-            <Text style={styles.heroTitle}>ParkSmart</Text>
-          </View>
-          <View style={styles.profileCircle}>
-            <Text style={styles.profileText}>P</Text>
-          </View>
-        </View>
-
-        <Text style={styles.heroMessage}>
+        <Text style={styles.smallLight}>WELCOME BACK</Text>
+        <Text style={styles.heroTitle}>ParkSmart</Text>
+        <Text style={styles.heroText}>
           Find a better place to park today.
         </Text>
 
@@ -77,43 +80,21 @@ function HomeScreen({ navigation }) {
       </View>
 
       <View style={styles.statsRow}>
-        <View style={styles.statBox}>
-          <Text style={styles.statNumber}>24</Text>
-          <Text style={styles.statLabel}>Available spots</Text>
-        </View>
-        <View style={styles.statBox}>
-          <Text style={styles.statNumber}>3</Text>
-          <Text style={styles.statLabel}>Nearby locations</Text>
-        </View>
+        <Stat value="24" label="Available spots" />
+        <Stat value={String(bookings.length)} label="My bookings" />
+        <Stat value={String(favourites.length)} label="Favourites" />
       </View>
 
       <Text style={styles.sectionTitle}>Quick actions</Text>
 
-      <View style={styles.actionGrid}>
-        <ActionCard
-          icon="⌕"
-          title="Find Parking"
-          subtitle="Search locations"
-          onPress={() => navigation.navigate('FindParking')}
-        />
-        <ActionCard
-          icon="▣"
-          title="My Bookings"
-          subtitle="View reservations"
-          onPress={() => navigation.navigate('MyBookings')}
-        />
-        <ActionCard
-          icon="♡"
-          title="Favourites"
-          subtitle="Saved locations"
-          onPress={() => navigation.navigate('Favourites')}
-        />
-        <ActionCard
-          icon="ⓘ"
-          title="About"
-          subtitle="How ParkSmart works"
-          onPress={() => navigation.navigate('About')}
-        />
+      <View style={styles.actionRow}>
+        <Action title="Find Parking" icon="⌕" onPress={() => navigation.navigate('FindParking')} />
+        <Action title="My Bookings" icon="▣" onPress={() => navigation.navigate('MyBookings')} />
+      </View>
+
+      <View style={styles.actionRow}>
+        <Action title="Favourites" icon="♡" onPress={() => navigation.navigate('Favourites')} />
+        <Action title="About" icon="ⓘ" onPress={() => navigation.navigate('About')} />
       </View>
 
       <Text style={styles.sectionTitle}>Popular nearby</Text>
@@ -122,21 +103,27 @@ function HomeScreen({ navigation }) {
         <ParkingCard
           key={parking.id}
           parking={parking}
-          onPress={() =>
-            navigation.navigate('ParkingDetails', { parking })
-          }
+          onPress={() => navigation.navigate('ParkingDetails', { parking })}
         />
       ))}
     </ScrollView>
   );
 }
 
-function ActionCard({ icon, title, subtitle, onPress }) {
+function Stat({ value, label }) {
   return (
-    <Pressable style={styles.actionCard} onPress={onPress}>
+    <View style={styles.stat}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function Action({ title, icon, onPress }) {
+  return (
+    <Pressable style={styles.action} onPress={onPress}>
       <Text style={styles.actionIcon}>{icon}</Text>
       <Text style={styles.actionTitle}>{title}</Text>
-      <Text style={styles.actionSubtitle}>{subtitle}</Text>
     </Pressable>
   );
 }
@@ -144,50 +131,44 @@ function ActionCard({ icon, title, subtitle, onPress }) {
 function FindParkingScreen({ navigation }) {
   const [search, setSearch] = useState('');
 
-  const filteredParking = useMemo(() => {
-    return parkingData.filter((parking) =>
-      `${parking.name} ${parking.location}`
-        .toLowerCase()
-        .includes(search.toLowerCase())
-    );
-  }, [search]);
+  const filtered = useMemo(
+    () =>
+      parkingData.filter((item) =>
+        `${item.name} ${item.location}`
+          .toLowerCase()
+          .includes(search.toLowerCase())
+      ),
+    [search]
+  );
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.pageLabel}>EXPLORE</Text>
+      <Text style={styles.label}>EXPLORE</Text>
       <Text style={styles.pageTitle}>Find Parking</Text>
-      <Text style={styles.pageDescription}>
+      <Text style={styles.description}>
         Search available parking locations near you.
       </Text>
 
-      <View style={styles.searchBox}>
-        <Text style={styles.searchIcon}>⌕</Text>
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search by location or name"
-          placeholderTextColor="#94A3B8"
-          style={styles.searchInput}
-        />
-      </View>
+      <TextInput
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search by name or location"
+        placeholderTextColor="#94A3B8"
+        style={styles.searchInput}
+      />
 
-      <View style={styles.resultHeader}>
-        <Text style={styles.sectionTitle}>Available locations</Text>
-        <Text style={styles.resultCount}>{filteredParking.length} found</Text>
-      </View>
+      <Text style={styles.sectionTitle}>Available locations</Text>
 
-      {filteredParking.map((parking) => (
+      {filtered.map((parking) => (
         <ParkingCard
           key={parking.id}
           parking={parking}
-          onPress={() =>
-            navigation.navigate('ParkingDetails', { parking })
-          }
+          onPress={() => navigation.navigate('ParkingDetails', { parking })}
         />
       ))}
 
-      {filteredParking.length === 0 && (
-        <View style={styles.emptyBox}>
+      {filtered.length === 0 && (
+        <View style={styles.empty}>
           <Text style={styles.emptyIcon}>⌕</Text>
           <Text style={styles.emptyTitle}>No locations found</Text>
           <Text style={styles.emptyText}>Try another search term.</Text>
@@ -206,19 +187,13 @@ function ParkingCard({ parking, onPress }) {
 
       <View style={styles.parkingInfo}>
         <Text style={styles.parkingName}>{parking.name}</Text>
-        <Text style={styles.parkingLocation}>{parking.location}</Text>
-
-        <View style={styles.parkingMeta}>
-          <Text style={styles.availableText}>
-            {parking.available} spots available
-          </Text>
-          <Text style={styles.distanceText}>{parking.distance}</Text>
-        </View>
+        <Text style={styles.muted}>{parking.location}</Text>
+        <Text style={styles.available}>{parking.available} spots available</Text>
       </View>
 
-      <View style={styles.priceBox}>
+      <View>
         <Text style={styles.price}>Rs. {parking.price}</Text>
-        <Text style={styles.perHour}>per hour</Text>
+        <Text style={styles.muted}>{parking.distance}</Text>
       </View>
     </Pressable>
   );
@@ -226,122 +201,162 @@ function ParkingCard({ parking, onPress }) {
 
 function ParkingDetailsScreen({ route, navigation }) {
   const parking = route.params?.parking || parkingData[0];
+  const { favourites, toggleFavourite } = useAppData();
+  const isFavourite = favourites.some((item) => item.id === parking.id);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <View style={[styles.detailBanner, { backgroundColor: parking.color }]}>
-        <Text style={styles.detailBannerIcon}>P</Text>
-        <Text style={styles.detailBannerText}>PARKING LOCATION</Text>
+      <View style={[styles.banner, { backgroundColor: parking.color }]}>
+        <Text style={styles.bannerIcon}>P</Text>
+        <Text style={styles.bannerText}>PARKING LOCATION</Text>
       </View>
 
       <Text style={styles.pageTitle}>{parking.name}</Text>
-      <Text style={styles.pageDescription}>{parking.location}</Text>
+      <Text style={styles.description}>{parking.location}</Text>
 
-      <View style={styles.detailStats}>
-        <DetailStat value={`Rs. ${parking.price}`} label="Per hour" />
-        <DetailStat value={parking.available} label="Available" />
-        <DetailStat value={parking.distance} label="Distance" />
+      <View style={styles.detailRow}>
+        <Stat value={`Rs.${parking.price}`} label="Per hour" />
+        <Stat value={parking.available} label="Available" />
+        <Stat value={parking.distance} label="Distance" />
       </View>
 
       <View style={styles.infoCard}>
         <Text style={styles.infoTitle}>Facilities</Text>
-        <Text style={styles.facility}>✓ 24-hour security</Text>
-        <Text style={styles.facility}>✓ CCTV monitoring</Text>
-        <Text style={styles.facility}>✓ Easy entrance and exit</Text>
-        <Text style={styles.facility}>✓ Suitable for cars and vans</Text>
+        <Text style={styles.infoText}>✓ 24-hour security</Text>
+        <Text style={styles.infoText}>✓ CCTV monitoring</Text>
+        <Text style={styles.infoText}>✓ Easy entrance and exit</Text>
       </View>
+
+      <Pressable
+        style={styles.secondaryButton}
+        onPress={() => toggleFavourite(parking)}
+      >
+        <Text style={styles.secondaryButtonText}>
+          {isFavourite ? '♥ Remove from favourites' : '♡ Add to favourites'}
+        </Text>
+      </Pressable>
 
       <Pressable
         style={styles.primaryButton}
         onPress={() => navigation.navigate('BookParking', { parking })}
       >
         <Text style={styles.primaryButtonText}>Reserve this location</Text>
-        <Text style={styles.primaryButtonArrow}>›</Text>
       </Pressable>
     </ScrollView>
   );
 }
 
-function DetailStat({ value, label }) {
-  return (
-    <View style={styles.detailStat}>
-      <Text style={styles.detailValue}>{value}</Text>
-      <Text style={styles.detailLabel}>{label}</Text>
-    </View>
-  );
-}
-
 function BookParkingScreen({ route }) {
   const parking = route.params?.parking || parkingData[0];
+  const { addBooking } = useAppData();
+  const [vehicle, setVehicle] = useState('');
+  const [duration, setDuration] = useState('');
+  const [saved, setSaved] = useState(false);
+
+  function confirmBooking() {
+    if (!vehicle.trim() || !duration.trim()) return;
+
+    addBooking({
+      ...parking,
+      vehicle,
+      duration,
+    });
+
+    setSaved(true);
+  }
 
   return (
-    <View style={styles.screen}>
-      <View style={styles.content}>
-        <Text style={styles.pageLabel}>RESERVATION</Text>
-        <Text style={styles.pageTitle}>Book Parking</Text>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <Text style={styles.label}>RESERVATION</Text>
+      <Text style={styles.pageTitle}>Book Parking</Text>
 
-        <View style={styles.bookingSummary}>
-          <Text style={styles.bookingName}>{parking.name}</Text>
-          <Text style={styles.bookingLocation}>{parking.location}</Text>
-          <Text style={styles.bookingPrice}>Rs. {parking.price} / hour</Text>
-        </View>
-
-        <Text style={styles.formLabel}>Vehicle number</Text>
-        <TextInput
-          placeholder="Example: ABC-1234"
-          placeholderTextColor="#94A3B8"
-          style={styles.input}
-        />
-
-        <Text style={styles.formLabel}>Duration</Text>
-        <TextInput
-          placeholder="Example: 2 hours"
-          placeholderTextColor="#94A3B8"
-          style={styles.input}
-        />
-
-        <Pressable style={styles.primaryButton}>
-          <Text style={styles.primaryButtonText}>Confirm booking</Text>
-        </Pressable>
+      <View style={styles.bookingBox}>
+        <Text style={styles.infoTitle}>{parking.name}</Text>
+        <Text style={styles.muted}>{parking.location}</Text>
+        <Text style={styles.price}>Rs. {parking.price} / hour</Text>
       </View>
-    </View>
+
+      <Text style={styles.formLabel}>Vehicle number</Text>
+      <TextInput
+        value={vehicle}
+        onChangeText={setVehicle}
+        placeholder="Example: ABC-1234"
+        placeholderTextColor="#94A3B8"
+        style={styles.input}
+      />
+
+      <Text style={styles.formLabel}>Duration</Text>
+      <TextInput
+        value={duration}
+        onChangeText={setDuration}
+        placeholder="Example: 2 hours"
+        placeholderTextColor="#94A3B8"
+        style={styles.input}
+      />
+
+      <Pressable style={styles.primaryButton} onPress={confirmBooking}>
+        <Text style={styles.primaryButtonText}>
+          {saved ? 'Booking saved locally' : 'Confirm booking'}
+        </Text>
+      </Pressable>
+    </ScrollView>
   );
 }
 
 function MyBookingsScreen() {
-  return (
-    <View style={styles.screen}>
-      <View style={styles.content}>
-        <Text style={styles.pageLabel}>YOUR ACTIVITY</Text>
-        <Text style={styles.pageTitle}>My Bookings</Text>
+  const { bookings } = useAppData();
 
-        <View style={styles.emptyBox}>
-          <Text style={styles.emptyIcon}>▣</Text>
-          <Text style={styles.emptyTitle}>No bookings yet</Text>
-          <Text style={styles.emptyText}>
-            Your confirmed parking bookings will appear here.
-          </Text>
-        </View>
-      </View>
-    </View>
+  return (
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <Text style={styles.label}>YOUR ACTIVITY</Text>
+      <Text style={styles.pageTitle}>My Bookings</Text>
+
+      {bookings.length === 0 ? (
+        <Empty title="No bookings yet" text="Your saved bookings will appear here." />
+      ) : (
+        bookings.map((booking) => (
+          <View key={booking.id} style={styles.infoCard}>
+            <Text style={styles.infoTitle}>{booking.parkingName}</Text>
+            <Text style={styles.infoText}>{booking.location}</Text>
+            <Text style={styles.infoText}>Vehicle: {booking.vehicle}</Text>
+            <Text style={styles.infoText}>Duration: {booking.duration}</Text>
+            <Text style={styles.muted}>{booking.bookedAt}</Text>
+          </View>
+        ))
+      )}
+    </ScrollView>
   );
 }
 
-function FavouritesScreen() {
-  return (
-    <View style={styles.screen}>
-      <View style={styles.content}>
-        <Text style={styles.pageLabel}>SAVED PLACES</Text>
-        <Text style={styles.pageTitle}>Favourites</Text>
+function FavouritesScreen({ navigation }) {
+  const { favourites } = useAppData();
 
-        <View style={styles.emptyBox}>
-          <Text style={styles.emptyIcon}>♡</Text>
-          <Text style={styles.emptyTitle}>No favourites yet</Text>
-          <Text style={styles.emptyText}>
-            Save your favourite parking locations for quick access.
-          </Text>
-        </View>
-      </View>
+  return (
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <Text style={styles.label}>SAVED PLACES</Text>
+      <Text style={styles.pageTitle}>Favourites</Text>
+
+      {favourites.length === 0 ? (
+        <Empty title="No favourites yet" text="Save locations for quick access." />
+      ) : (
+        favourites.map((parking) => (
+          <ParkingCard
+            key={parking.id}
+            parking={parking}
+            onPress={() => navigation.navigate('ParkingDetails', { parking })}
+          />
+        ))
+      )}
+    </ScrollView>
+  );
+}
+
+function Empty({ title, text }) {
+  return (
+    <View style={styles.empty}>
+      <Text style={styles.emptyIcon}>♡</Text>
+      <Text style={styles.emptyTitle}>{title}</Text>
+      <Text style={styles.emptyText}>{text}</Text>
     </View>
   );
 }
@@ -350,12 +365,11 @@ function AboutScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.content}>
-        <Text style={styles.pageLabel}>ABOUT THE APP</Text>
+        <Text style={styles.label}>ABOUT THE APP</Text>
         <Text style={styles.pageTitle}>ParkSmart</Text>
-        <Text style={styles.pageDescription}>
-          ParkSmart helps drivers find and manage parking locations easily.
-          This student project works with locally stored data and does not
-          require an internet connection.
+        <Text style={styles.description}>
+          ParkSmart helps drivers find and manage parking locations using
+          locally stored data. The app works without an internet connection.
         </Text>
       </View>
     </View>
@@ -363,55 +377,89 @@ function AboutScreen() {
 }
 
 export default function App() {
+  const [bookings, setBookings] = useState([]);
+  const [favourites, setFavourites] = useState([]);
+
+  useEffect(() => {
+    async function loadData() {
+      const savedBookings = await AsyncStorage.getItem('parkSmartBookings');
+      const savedFavourites = await AsyncStorage.getItem('parkSmartFavourites');
+
+      if (savedBookings) setBookings(JSON.parse(savedBookings));
+      if (savedFavourites) setFavourites(JSON.parse(savedFavourites));
+    }
+
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem('parkSmartBookings', JSON.stringify(bookings));
+  }, [bookings]);
+
+  useEffect(() => {
+    AsyncStorage.setItem('parkSmartFavourites', JSON.stringify(favourites));
+  }, [favourites]);
+
+  function addBooking(parking) {
+    const booking = {
+      id: Date.now().toString(),
+      parkingName: parking.name,
+      location: parking.location,
+      price: parking.price,
+      vehicle: parking.vehicle,
+      duration: parking.duration,
+      bookedAt: new Date().toLocaleString(),
+    };
+
+    setBookings((current) => [booking, ...current]);
+  }
+
+  function toggleFavourite(parking) {
+    setFavourites((current) => {
+      const exists = current.some((item) => item.id === parking.id);
+
+      return exists
+        ? current.filter((item) => item.id !== parking.id)
+        : [...current, parking];
+    });
+  }
+
   return (
-    <SafeAreaProvider>
-      <NavigationContainer>
-        <Stack.Navigator
-          screenOptions={{
-            headerStyle: { backgroundColor: '#102A56' },
-            headerTintColor: '#FFFFFF',
-            headerTitleStyle: { fontWeight: '700' },
-            contentStyle: { backgroundColor: '#F5F7FB' },
-          }}
-        >
-          <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'ParkSmart' }} />
-          <Stack.Screen name="FindParking" component={FindParkingScreen} options={{ title: 'Find Parking' }} />
-          <Stack.Screen name="ParkingDetails" component={ParkingDetailsScreen} options={{ title: 'Details' }} />
-          <Stack.Screen name="BookParking" component={BookParkingScreen} options={{ title: 'Booking' }} />
-          <Stack.Screen name="MyBookings" component={MyBookingsScreen} options={{ title: 'My Bookings' }} />
-          <Stack.Screen name="Favourites" component={FavouritesScreen} />
-          <Stack.Screen name="About" component={AboutScreen} />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </SafeAreaProvider>
+    <AppContext.Provider value={{ bookings, favourites, addBooking, toggleFavourite }}>
+      <SafeAreaProvider>
+        <NavigationContainer>
+          <Stack.Navigator
+            screenOptions={{
+              headerStyle: { backgroundColor: '#102A56' },
+              headerTintColor: '#FFFFFF',
+              headerTitleStyle: { fontWeight: '700' },
+              contentStyle: { backgroundColor: '#F5F7FB' },
+            }}
+          >
+            <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'ParkSmart' }} />
+            <Stack.Screen name="FindParking" component={FindParkingScreen} options={{ title: 'Find Parking' }} />
+            <Stack.Screen name="ParkingDetails" component={ParkingDetailsScreen} options={{ title: 'Details' }} />
+            <Stack.Screen name="BookParking" component={BookParkingScreen} options={{ title: 'Booking' }} />
+            <Stack.Screen name="MyBookings" component={MyBookingsScreen} options={{ title: 'My Bookings' }} />
+            <Stack.Screen name="Favourites" component={FavouritesScreen} />
+            <Stack.Screen name="About" component={AboutScreen} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </AppContext.Provider>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#F5F7FB',
-  },
-  homeContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 40,
-  },
+  screen: { flex: 1, backgroundColor: '#F5F7FB' },
+  content: { padding: 20, paddingBottom: 40 },
   hero: {
     backgroundColor: '#102A56',
     borderRadius: 24,
     padding: 24,
     marginBottom: 16,
   },
-  heroTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  welcome: {
+  smallLight: {
     color: '#9DBAE5',
     fontSize: 11,
     fontWeight: '800',
@@ -419,110 +467,86 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: '#FFFFFF',
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: '800',
     marginTop: 6,
   },
-  profileCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#3B82F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  profileText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  heroMessage: {
+  heroText: {
     color: '#D9E7FA',
     fontSize: 17,
-    lineHeight: 25,
-    marginTop: 28,
-    maxWidth: 230,
+    marginTop: 22,
+    marginBottom: 20,
   },
   heroButton: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 14,
-    marginTop: 22,
+    padding: 15,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
   },
-  heroButtonText: {
-    color: '#102A56',
-    fontWeight: '800',
-  },
-  arrow: {
-    color: '#2563EB',
-    fontSize: 25,
-    lineHeight: 20,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-  },
-  statBox: {
+  heroButtonText: { color: '#102A56', fontWeight: '800' },
+  arrow: { color: '#2563EB', fontSize: 22 },
+  statsRow: { flexDirection: 'row', marginBottom: 24 },
+  stat: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 14,
+    padding: 14,
+    marginRight: 8,
     borderWidth: 1,
     borderColor: '#E5EAF2',
   },
-  statNumber: {
-    color: '#102A56',
-    fontSize: 24,
-    fontWeight: '800',
-  },
-  statLabel: {
-    color: '#718096',
-    fontSize: 12,
-    marginTop: 5,
-  },
+  statValue: { color: '#102A56', fontSize: 20, fontWeight: '800' },
+  statLabel: { color: '#718096', fontSize: 11, marginTop: 4 },
   sectionTitle: {
     color: '#102A56',
     fontSize: 18,
     fontWeight: '800',
     marginBottom: 12,
   },
-  actionGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 26,
-  },
-  actionCard: {
-    width: '48%',
+  actionRow: { flexDirection: 'row', marginBottom: 12 },
+  action: {
+    flex: 1,
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 15,
+    padding: 17,
+    marginRight: 8,
     borderWidth: 1,
     borderColor: '#E5EAF2',
   },
-  actionIcon: {
+  actionIcon: { color: '#2563EB', fontSize: 25, marginBottom: 10 },
+  actionTitle: { color: '#102A56', fontWeight: '800' },
+  label: {
     color: '#2563EB',
-    fontSize: 25,
+    fontSize: 11,
     fontWeight: '800',
-    marginBottom: 12,
+    letterSpacing: 1.5,
+    marginBottom: 7,
   },
-  actionTitle: {
+  pageTitle: {
     color: '#102A56',
-    fontSize: 14,
+    fontSize: 29,
     fontWeight: '800',
+    marginBottom: 8,
   },
-  actionSubtitle: {
+  description: {
     color: '#718096',
-    fontSize: 12,
-    marginTop: 5,
+    fontSize: 15,
+    lineHeight: 23,
+    marginBottom: 20,
+  },
+  searchInput: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 13,
+    padding: 15,
+    color: '#102A56',
+    borderWidth: 1,
+    borderColor: '#E5EAF2',
+    marginBottom: 24,
   },
   parkingCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
+    borderRadius: 17,
     padding: 15,
     marginBottom: 12,
     flexDirection: 'row',
@@ -538,234 +562,70 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 12,
   },
-  parkingIconText: {
-    color: '#FFFFFF',
-    fontSize: 21,
-    fontWeight: '900',
-  },
-  parkingInfo: {
-    flex: 1,
-  },
-  parkingName: {
-    color: '#102A56',
-    fontSize: 15,
-    fontWeight: '800',
-  },
-  parkingLocation: {
-    color: '#718096',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  parkingMeta: {
-    flexDirection: 'row',
-    marginTop: 9,
-    gap: 10,
-  },
-  availableText: {
-    color: '#059669',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  distanceText: {
-    color: '#718096',
-    fontSize: 11,
-  },
-  priceBox: {
-    alignItems: 'flex-end',
-  },
-  price: {
-    color: '#102A56',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  perHour: {
-    color: '#94A3B8',
-    fontSize: 10,
-    marginTop: 3,
-  },
-  pageLabel: {
-    color: '#2563EB',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-    marginBottom: 7,
-  },
-  pageTitle: {
-    color: '#102A56',
-    fontSize: 29,
-    fontWeight: '800',
-    marginBottom: 8,
-  },
-  pageDescription: {
-    color: '#718096',
-    fontSize: 15,
-    lineHeight: 23,
-    marginBottom: 22,
-  },
-  searchBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    paddingHorizontal: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5EAF2',
-    marginBottom: 24,
-  },
-  searchIcon: {
-    fontSize: 24,
-    color: '#2563EB',
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    color: '#102A56',
-    fontSize: 14,
-    paddingVertical: 15,
-  },
-  resultHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  resultCount: {
-    color: '#718096',
-    fontSize: 12,
-    marginBottom: 12,
-  },
-  detailBanner: {
+  parkingIconText: { color: '#FFFFFF', fontSize: 21, fontWeight: '900' },
+  parkingInfo: { flex: 1 },
+  parkingName: { color: '#102A56', fontWeight: '800', fontSize: 15 },
+  muted: { color: '#718096', fontSize: 12, marginTop: 4 },
+  available: { color: '#059669', fontSize: 11, marginTop: 8 },
+  price: { color: '#102A56', fontWeight: '800', fontSize: 13 },
+  banner: {
     height: 150,
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 22,
   },
-  detailBannerIcon: {
-    color: '#FFFFFF',
-    fontSize: 54,
-    fontWeight: '900',
-  },
-  detailBannerText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.3,
-  },
-  detailStats: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginVertical: 16,
-    borderWidth: 1,
-    borderColor: '#E5EAF2',
-  },
-  detailStat: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  detailValue: {
-    color: '#102A56',
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  detailLabel: {
-    color: '#718096',
-    fontSize: 11,
-    marginTop: 5,
-  },
+  bannerIcon: { color: '#FFFFFF', fontSize: 52, fontWeight: '900' },
+  bannerText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
+  detailRow: { flexDirection: 'row', marginVertical: 14 },
   infoCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 18,
-    marginBottom: 20,
+    marginBottom: 16,
   },
-  infoTitle: {
-    color: '#102A56',
-    fontSize: 17,
-    fontWeight: '800',
-    marginBottom: 12,
-  },
-  facility: {
-    color: '#526176',
-    fontSize: 14,
-    marginTop: 9,
-  },
+  infoTitle: { color: '#102A56', fontSize: 17, fontWeight: '800', marginBottom: 10 },
+  infoText: { color: '#526176', fontSize: 14, marginTop: 8 },
   primaryButton: {
     backgroundColor: '#2563EB',
     borderRadius: 14,
     padding: 17,
-    flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    gap: 10,
+    marginTop: 10,
   },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800',
+  primaryButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 15 },
+  secondaryButton: {
+    backgroundColor: '#E8F0FF',
+    borderRadius: 14,
+    padding: 17,
+    alignItems: 'center',
+    marginBottom: 4,
   },
-  primaryButtonArrow: {
-    color: '#FFFFFF',
-    fontSize: 22,
-  },
-  bookingSummary: {
+  secondaryButtonText: { color: '#2563EB', fontWeight: '800' },
+  bookingBox: {
     backgroundColor: '#E8F0FF',
     borderRadius: 16,
     padding: 18,
     marginBottom: 24,
   },
-  bookingName: {
-    color: '#102A56',
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  bookingLocation: {
-    color: '#526176',
-    marginTop: 5,
-  },
-  bookingPrice: {
-    color: '#2563EB',
-    fontWeight: '800',
-    marginTop: 12,
-  },
-  formLabel: {
-    color: '#102A56',
-    fontSize: 13,
-    fontWeight: '800',
-    marginBottom: 8,
-  },
+  formLabel: { color: '#102A56', fontWeight: '800', marginBottom: 8 },
   input: {
     backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E5EAF2',
-    borderRadius: 12,
     padding: 15,
     color: '#102A56',
     marginBottom: 18,
   },
-  emptyBox: {
+  empty: {
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
     padding: 30,
     alignItems: 'center',
     marginTop: 14,
   },
-  emptyIcon: {
-    color: '#2563EB',
-    fontSize: 42,
-    marginBottom: 12,
-  },
-  emptyTitle: {
-    color: '#102A56',
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  emptyText: {
-    color: '#718096',
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginTop: 7,
-  },
+  emptyIcon: { color: '#2563EB', fontSize: 42, marginBottom: 12 },
+  emptyTitle: { color: '#102A56', fontSize: 17, fontWeight: '800' },
+  emptyText: { color: '#718096', textAlign: 'center', marginTop: 8 },
 });

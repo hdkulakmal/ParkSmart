@@ -21,11 +21,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 const Stack = createNativeStackNavigator();
 const AppContext = createContext(null);
 
-function useAppData() {
-  return useContext(AppContext);
-}
-
-const defaultParking = [
+const parkingDefaults = [
   {
     id: 1,
     name: 'City Center Parking',
@@ -55,6 +51,10 @@ const defaultParking = [
   },
 ];
 
+function useAppData() {
+  return useContext(AppContext);
+}
+
 function HomeScreen({ navigation }) {
   const { role } = useAppData();
 
@@ -71,7 +71,7 @@ function DriverHome({ navigation }) {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.hero}>
-        <Text style={styles.smallLight}>DRIVER MODE</Text>
+        <Text style={styles.lightLabel}>DRIVER MODE</Text>
         <Text style={styles.heroTitle}>ParkSmart</Text>
         <Text style={styles.heroText}>
           Find a better place to park today.
@@ -95,8 +95,8 @@ function DriverHome({ navigation }) {
 
       <View style={styles.statsRow}>
         <Stat value="24" label="Available spots" />
-        <Stat value={String(bookings.length)} label="My bookings" />
-        <Stat value={String(favourites.length)} label="Favourites" />
+        <Stat value={bookings.length} label="My bookings" />
+        <Stat value={favourites.length} label="Favourites" />
       </View>
 
       <Text style={styles.sectionTitle}>Quick actions</Text>
@@ -120,10 +120,10 @@ function OwnerHome({ navigation }) {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.ownerHero}>
-        <Text style={styles.smallLight}>PARKING OWNER MODE</Text>
+        <Text style={styles.lightLabel}>PARKING OWNER MODE</Text>
         <Text style={styles.heroTitle}>Manage your spaces</Text>
         <Text style={styles.heroText}>
-          Add your parking location and let drivers discover it.
+          Add your parking location for drivers to discover.
         </Text>
       </View>
 
@@ -142,7 +142,7 @@ function OwnerHome({ navigation }) {
       </Pressable>
 
       <Text style={styles.sectionTitle}>
-        My listed spots ({parkingSpots.length})
+        Listed spots ({parkingSpots.length})
       </Text>
 
       {parkingSpots.map((parking) => (
@@ -155,7 +155,7 @@ function OwnerHome({ navigation }) {
 function RoleScreen({ navigation }) {
   const { setRole } = useAppData();
 
-  function chooseRole(role) {
+  function selectRole(role) {
     setRole(role);
     navigation.navigate('Home');
   }
@@ -166,19 +166,19 @@ function RoleScreen({ navigation }) {
         <Text style={styles.label}>CHOOSE MODE</Text>
         <Text style={styles.pageTitle}>How will you use ParkSmart?</Text>
         <Text style={styles.description}>
-          You can switch between these modes at any time.
+          You can switch between these modes whenever you want.
         </Text>
 
-        <Pressable style={styles.roleCard} onPress={() => chooseRole('driver')}>
+        <Pressable style={styles.roleCard} onPress={() => selectRole('driver')}>
           <Text style={styles.roleIcon}>🚗</Text>
           <Text style={styles.roleTitle}>I am a Driver</Text>
           <Text style={styles.muted}>Find and book parking spaces.</Text>
         </Pressable>
 
-        <Pressable style={styles.roleCard} onPress={() => chooseRole('owner')}>
+        <Pressable style={styles.roleCard} onPress={() => selectRole('owner')}>
           <Text style={styles.roleIcon}>🏢</Text>
           <Text style={styles.roleTitle}>I am a Parking Owner</Text>
-          <Text style={styles.muted}>Add and manage my parking spaces.</Text>
+          <Text style={styles.muted}>Add and manage parking spaces.</Text>
         </Pressable>
       </View>
     </View>
@@ -211,9 +211,6 @@ function AddParkingScreen({ navigation }) {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.label}>OWNER TOOL</Text>
       <Text style={styles.pageTitle}>Add Parking Spot</Text>
-      <Text style={styles.description}>
-        Add details about the parking space you want drivers to see.
-      </Text>
 
       <Text style={styles.formLabel}>Parking name</Text>
       <TextInput
@@ -266,8 +263,8 @@ function FindParkingScreen({ navigation }) {
 
   const filtered = useMemo(
     () =>
-      parkingSpots.filter((item) =>
-        `${item.name} ${item.location}`
+      parkingSpots.filter((parking) =>
+        `${parking.name} ${parking.location}`
           .toLowerCase()
           .includes(search.toLowerCase())
       ),
@@ -284,7 +281,7 @@ function FindParkingScreen({ navigation }) {
         onChangeText={setSearch}
         placeholder="Search by name or location"
         placeholderTextColor="#94A3B8"
-        style={styles.searchInput}
+        style={styles.input}
       />
 
       {filtered.map((parking) => (
@@ -318,6 +315,8 @@ function ParkingCard({ parking, onPress }) {
 
 function ParkingDetailsScreen({ route, navigation }) {
   const parking = route.params?.parking;
+  const { favourites, toggleFavourite } = useAppData();
+  const isFavourite = favourites.some((item) => item.id === parking.id);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -335,6 +334,15 @@ function ParkingDetailsScreen({ route, navigation }) {
         <Text style={styles.infoText}>✓ Security available</Text>
         <Text style={styles.infoText}>✓ CCTV monitoring</Text>
       </View>
+
+      <Pressable
+        style={styles.secondaryButton}
+        onPress={() => toggleFavourite(parking)}
+      >
+        <Text style={styles.secondaryButtonText}>
+          {isFavourite ? '♥ Remove from favourites' : '♡ Add to favourites'}
+        </Text>
+      </Pressable>
 
       <Pressable
         style={styles.primaryButton}
@@ -365,7 +373,7 @@ function BookParkingScreen({ route }) {
       <Text style={styles.label}>RESERVATION</Text>
       <Text style={styles.pageTitle}>Book Parking</Text>
 
-      <View style={styles.bookingBox}>
+      <View style={styles.infoCard}>
         <Text style={styles.infoTitle}>{parking.name}</Text>
         <Text style={styles.muted}>{parking.location}</Text>
         <Text style={styles.price}>Rs. {parking.price} / hour</Text>
@@ -414,6 +422,7 @@ function MyBookingsScreen() {
             <Text style={styles.infoText}>{booking.location}</Text>
             <Text style={styles.infoText}>Vehicle: {booking.vehicle}</Text>
             <Text style={styles.infoText}>Duration: {booking.duration}</Text>
+            <Text style={styles.muted}>{booking.bookedAt}</Text>
           </View>
         ))
       )}
@@ -428,16 +437,16 @@ function FavouritesScreen({ navigation }) {
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.pageTitle}>Favourites</Text>
 
-      {favourites.map((parking) => (
-        <ParkingCard
-          key={parking.id}
-          parking={parking}
-          onPress={() => navigation.navigate('ParkingDetails', { parking })}
-        />
-      ))}
-
-      {favourites.length === 0 && (
-        <Text style={styles.description}>No favourites yet.</Text>
+      {favourites.length === 0 ? (
+        <Text style={styles.description}>No favourite locations yet.</Text>
+      ) : (
+        favourites.map((parking) => (
+          <ParkingCard
+            key={parking.id}
+            parking={parking}
+            onPress={() => navigation.navigate('ParkingDetails', { parking })}
+          />
+        ))
       )}
     </ScrollView>
   );
@@ -450,7 +459,7 @@ function AboutScreen() {
         <Text style={styles.pageTitle}>About ParkSmart</Text>
         <Text style={styles.description}>
           ParkSmart is an offline parking management app. Drivers can find and
-          book parking, while owners can add and manage their own spaces.
+          book parking while owners can add and manage their parking spaces.
         </Text>
       </View>
     </View>
@@ -475,11 +484,9 @@ function Action({ title, icon, onPress }) {
   );
 }
 
-
-
 export default function App() {
   const [role, setRoleState] = useState('driver');
-  const [parkingSpots, setParkingSpots] = useState(defaultParking);
+  const [parkingSpots, setParkingSpots] = useState(parkingDefaults);
   const [bookings, setBookings] = useState([]);
   const [favourites, setFavourites] = useState([]);
 
@@ -513,10 +520,7 @@ export default function App() {
   function addParking(parking) {
     setParkingSpots((current) => [
       ...current,
-      {
-        ...parking,
-        id: Date.now(),
-      },
+      { ...parking, id: Date.now() },
     ]);
   }
 
@@ -534,6 +538,16 @@ export default function App() {
     ]);
   }
 
+  function toggleFavourite(parking) {
+    setFavourites((current) => {
+      const exists = current.some((item) => item.id === parking.id);
+
+      return exists
+        ? current.filter((item) => item.id !== parking.id)
+        : [...current, parking];
+    });
+  }
+
   return (
     <AppContext.Provider
       value={{
@@ -544,6 +558,7 @@ export default function App() {
         bookings,
         addBooking,
         favourites,
+        toggleFavourite,
       }}
     >
       <SafeAreaProvider>
@@ -574,6 +589,7 @@ export default function App() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F5F7FB' },
   content: { padding: 20, paddingBottom: 40 },
+
   hero: {
     backgroundColor: '#102A56',
     borderRadius: 24,
@@ -586,52 +602,54 @@ const styles = StyleSheet.create({
     padding: 24,
     marginBottom: 18,
   },
-  smallLight: {
-    color: '#D9E7FA',
+  lightLabel: {
+    color: '#C7D8F4',
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 1.5,
+    letterSpacing: 1.4,
   },
   heroTitle: {
     color: '#FFFFFF',
-    fontSize: 30,
+    fontSize: 31,
     fontWeight: '800',
-    marginTop: 7,
+    marginTop: 8,
   },
   heroText: {
     color: '#D9E7FA',
     fontSize: 16,
-    marginTop: 20,
-    marginBottom: 20,
     lineHeight: 23,
+    marginVertical: 20,
   },
   heroButton: {
     backgroundColor: '#FFFFFF',
-    padding: 15,
     borderRadius: 12,
+    padding: 15,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   heroButtonText: { color: '#102A56', fontWeight: '800' },
   arrow: { color: '#2563EB', fontSize: 22 },
+
   switchButton: {
     backgroundColor: '#E8F0FF',
-    padding: 14,
     borderRadius: 12,
+    padding: 14,
     alignItems: 'center',
     marginBottom: 18,
   },
   switchText: { color: '#2563EB', fontWeight: '800' },
+
   statsRow: { flexDirection: 'row', marginBottom: 24 },
   stat: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    padding: 14,
     borderRadius: 14,
+    padding: 14,
     marginRight: 8,
   },
-  statValue: { color: '#102A56', fontSize: 20, fontWeight: '800' },
+  statValue: { color: '#102A56', fontSize: 21, fontWeight: '800' },
   statLabel: { color: '#718096', fontSize: 11, marginTop: 4 },
+
   sectionTitle: {
     color: '#102A56',
     fontSize: 18,
@@ -648,28 +666,75 @@ const styles = StyleSheet.create({
   },
   actionIcon: { color: '#2563EB', fontSize: 25, marginBottom: 10 },
   actionTitle: { color: '#102A56', fontWeight: '800' },
+
   label: {
     color: '#2563EB',
     fontSize: 11,
     fontWeight: '800',
-    letterSpacing: 1.5,
+    letterSpacing: 1.4,
     marginBottom: 8,
   },
   pageTitle: {
     color: '#102A56',
     fontSize: 29,
     fontWeight: '800',
-    marginBottom: 10,
+    marginBottom: 12,
   },
-  description: { color: '#718096', fontSize: 15, lineHeight: 23 },
+  description: {
+    color: '#718096',
+    fontSize: 15,
+    lineHeight: 23,
+    marginBottom: 18,
+  },
+
   roleCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
     padding: 22,
     marginBottom: 16,
   },
-  roleIcon: { fontSize: 35, marginBottom: 12 },
+  roleIcon: { fontSize: 34, marginBottom: 12 },
   roleTitle: { color: '#102A56', fontSize: 18, fontWeight: '800' },
+
+  input: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 15,
+    color: '#102A56',
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: '#E5EAF2',
+  },
+  formLabel: {
+    color: '#102A56',
+    fontWeight: '800',
+    marginBottom: 8,
+  },
+
+  primaryButton: {
+    backgroundColor: '#2563EB',
+    borderRadius: 14,
+    padding: 17,
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  secondaryButton: {
+    backgroundColor: '#E8F0FF',
+    borderRadius: 14,
+    padding: 17,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  secondaryButtonText: {
+    color: '#2563EB',
+    fontWeight: '800',
+  },
+
   parkingCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 17,
@@ -692,13 +757,7 @@ const styles = StyleSheet.create({
   muted: { color: '#718096', fontSize: 12, marginTop: 4 },
   available: { color: '#059669', fontSize: 11, marginTop: 8 },
   price: { color: '#102A56', fontWeight: '800' },
-  searchInput: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 13,
-    padding: 15,
-    marginBottom: 22,
-    color: '#102A56',
-  },
+
   banner: {
     height: 145,
     borderRadius: 22,
@@ -708,6 +767,7 @@ const styles = StyleSheet.create({
   },
   bannerIcon: { color: '#FFFFFF', fontSize: 52, fontWeight: '900' },
   bannerText: { color: '#FFFFFF', fontWeight: '800' },
+
   infoCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -716,26 +776,4 @@ const styles = StyleSheet.create({
   },
   infoTitle: { color: '#102A56', fontSize: 17, fontWeight: '800' },
   infoText: { color: '#526176', marginTop: 9 },
-  bookingBox: {
-    backgroundColor: '#E8F0FF',
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 22,
-  },
-  formLabel: { color: '#102A56', fontWeight: '800', marginBottom: 8 },
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 15,
-    color: '#102A56',
-    marginBottom: 18,
-  },
-  primaryButton: {
-    backgroundColor: '#2563EB',
-    padding: 17,
-    borderRadius: 14,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  primaryButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 15 },
 });

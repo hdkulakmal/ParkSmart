@@ -12,7 +12,6 @@ import {
   Pressable,
   ScrollView,
   TextInput,
-  StatusBar,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
@@ -26,7 +25,7 @@ function useAppData() {
   return useContext(AppContext);
 }
 
-const parkingData = [
+const defaultParking = [
   {
     id: 1,
     name: 'City Center Parking',
@@ -57,14 +56,22 @@ const parkingData = [
 ];
 
 function HomeScreen({ navigation }) {
+  const { role } = useAppData();
+
+  return role === 'owner' ? (
+    <OwnerHome navigation={navigation} />
+  ) : (
+    <DriverHome navigation={navigation} />
+  );
+}
+
+function DriverHome({ navigation }) {
   const { bookings, favourites } = useAppData();
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <StatusBar barStyle="light-content" />
-
       <View style={styles.hero}>
-        <Text style={styles.smallLight}>WELCOME BACK</Text>
+        <Text style={styles.smallLight}>DRIVER MODE</Text>
         <Text style={styles.heroTitle}>ParkSmart</Text>
         <Text style={styles.heroText}>
           Find a better place to park today.
@@ -78,6 +85,13 @@ function HomeScreen({ navigation }) {
           <Text style={styles.arrow}>›</Text>
         </Pressable>
       </View>
+
+      <Pressable
+        style={styles.switchButton}
+        onPress={() => navigation.navigate('Role')}
+      >
+        <Text style={styles.switchText}>Switch to Parking Owner mode</Text>
+      </Pressable>
 
       <View style={styles.statsRow}>
         <Stat value="24" label="Available spots" />
@@ -96,58 +110,174 @@ function HomeScreen({ navigation }) {
         <Action title="Favourites" icon="♡" onPress={() => navigation.navigate('Favourites')} />
         <Action title="About" icon="ⓘ" onPress={() => navigation.navigate('About')} />
       </View>
+    </ScrollView>
+  );
+}
 
-      <Text style={styles.sectionTitle}>Popular nearby</Text>
+function OwnerHome({ navigation }) {
+  const { parkingSpots } = useAppData();
 
-      {parkingData.slice(0, 2).map((parking) => (
-        <ParkingCard
-          key={parking.id}
-          parking={parking}
-          onPress={() => navigation.navigate('ParkingDetails', { parking })}
-        />
+  return (
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <View style={styles.ownerHero}>
+        <Text style={styles.smallLight}>PARKING OWNER MODE</Text>
+        <Text style={styles.heroTitle}>Manage your spaces</Text>
+        <Text style={styles.heroText}>
+          Add your parking location and let drivers discover it.
+        </Text>
+      </View>
+
+      <Pressable
+        style={styles.primaryButton}
+        onPress={() => navigation.navigate('AddParking')}
+      >
+        <Text style={styles.primaryButtonText}>＋ Add parking spot</Text>
+      </Pressable>
+
+      <Pressable
+        style={styles.switchButton}
+        onPress={() => navigation.navigate('Role')}
+      >
+        <Text style={styles.switchText}>Switch to Driver mode</Text>
+      </Pressable>
+
+      <Text style={styles.sectionTitle}>
+        My listed spots ({parkingSpots.length})
+      </Text>
+
+      {parkingSpots.map((parking) => (
+        <ParkingCard key={parking.id} parking={parking} />
       ))}
     </ScrollView>
   );
 }
 
-function Stat({ value, label }) {
+function RoleScreen({ navigation }) {
+  const { setRole } = useAppData();
+
+  function chooseRole(role) {
+    setRole(role);
+    navigation.navigate('Home');
+  }
+
   return (
-    <View style={styles.stat}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+    <View style={styles.screen}>
+      <View style={styles.content}>
+        <Text style={styles.label}>CHOOSE MODE</Text>
+        <Text style={styles.pageTitle}>How will you use ParkSmart?</Text>
+        <Text style={styles.description}>
+          You can switch between these modes at any time.
+        </Text>
+
+        <Pressable style={styles.roleCard} onPress={() => chooseRole('driver')}>
+          <Text style={styles.roleIcon}>🚗</Text>
+          <Text style={styles.roleTitle}>I am a Driver</Text>
+          <Text style={styles.muted}>Find and book parking spaces.</Text>
+        </Pressable>
+
+        <Pressable style={styles.roleCard} onPress={() => chooseRole('owner')}>
+          <Text style={styles.roleIcon}>🏢</Text>
+          <Text style={styles.roleTitle}>I am a Parking Owner</Text>
+          <Text style={styles.muted}>Add and manage my parking spaces.</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
-function Action({ title, icon, onPress }) {
+function AddParkingScreen({ navigation }) {
+  const { addParking } = useAppData();
+  const [name, setName] = useState('');
+  const [location, setLocation] = useState('');
+  const [price, setPrice] = useState('');
+  const [available, setAvailable] = useState('');
+
+  function saveParking() {
+    if (!name || !location || !price || !available) return;
+
+    addParking({
+      name,
+      location,
+      price: Number(price),
+      available: Number(available),
+      distance: 'New',
+      color: '#EA580C',
+    });
+
+    navigation.navigate('Home');
+  }
+
   return (
-    <Pressable style={styles.action} onPress={onPress}>
-      <Text style={styles.actionIcon}>{icon}</Text>
-      <Text style={styles.actionTitle}>{title}</Text>
-    </Pressable>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+      <Text style={styles.label}>OWNER TOOL</Text>
+      <Text style={styles.pageTitle}>Add Parking Spot</Text>
+      <Text style={styles.description}>
+        Add details about the parking space you want drivers to see.
+      </Text>
+
+      <Text style={styles.formLabel}>Parking name</Text>
+      <TextInput
+        value={name}
+        onChangeText={setName}
+        placeholder="Example: My City Parking"
+        placeholderTextColor="#94A3B8"
+        style={styles.input}
+      />
+
+      <Text style={styles.formLabel}>Location</Text>
+      <TextInput
+        value={location}
+        onChangeText={setLocation}
+        placeholder="Example: Colombo 05"
+        placeholderTextColor="#94A3B8"
+        style={styles.input}
+      />
+
+      <Text style={styles.formLabel}>Price per hour</Text>
+      <TextInput
+        value={price}
+        onChangeText={setPrice}
+        keyboardType="numeric"
+        placeholder="Example: 150"
+        placeholderTextColor="#94A3B8"
+        style={styles.input}
+      />
+
+      <Text style={styles.formLabel}>Available slots</Text>
+      <TextInput
+        value={available}
+        onChangeText={setAvailable}
+        keyboardType="numeric"
+        placeholder="Example: 20"
+        placeholderTextColor="#94A3B8"
+        style={styles.input}
+      />
+
+      <Pressable style={styles.primaryButton} onPress={saveParking}>
+        <Text style={styles.primaryButtonText}>Save parking spot</Text>
+      </Pressable>
+    </ScrollView>
   );
 }
 
 function FindParkingScreen({ navigation }) {
+  const { parkingSpots } = useAppData();
   const [search, setSearch] = useState('');
 
   const filtered = useMemo(
     () =>
-      parkingData.filter((item) =>
+      parkingSpots.filter((item) =>
         `${item.name} ${item.location}`
           .toLowerCase()
           .includes(search.toLowerCase())
       ),
-    [search]
+    [search, parkingSpots]
   );
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.label}>EXPLORE</Text>
       <Text style={styles.pageTitle}>Find Parking</Text>
-      <Text style={styles.description}>
-        Search available parking locations near you.
-      </Text>
 
       <TextInput
         value={search}
@@ -157,8 +287,6 @@ function FindParkingScreen({ navigation }) {
         style={styles.searchInput}
       />
 
-      <Text style={styles.sectionTitle}>Available locations</Text>
-
       {filtered.map((parking) => (
         <ParkingCard
           key={parking.id}
@@ -166,14 +294,6 @@ function FindParkingScreen({ navigation }) {
           onPress={() => navigation.navigate('ParkingDetails', { parking })}
         />
       ))}
-
-      {filtered.length === 0 && (
-        <View style={styles.empty}>
-          <Text style={styles.emptyIcon}>⌕</Text>
-          <Text style={styles.emptyTitle}>No locations found</Text>
-          <Text style={styles.emptyText}>Try another search term.</Text>
-        </View>
-      )}
     </ScrollView>
   );
 }
@@ -188,21 +308,16 @@ function ParkingCard({ parking, onPress }) {
       <View style={styles.parkingInfo}>
         <Text style={styles.parkingName}>{parking.name}</Text>
         <Text style={styles.muted}>{parking.location}</Text>
-        <Text style={styles.available}>{parking.available} spots available</Text>
+        <Text style={styles.available}>{parking.available} slots available</Text>
       </View>
 
-      <View>
-        <Text style={styles.price}>Rs. {parking.price}</Text>
-        <Text style={styles.muted}>{parking.distance}</Text>
-      </View>
+      <Text style={styles.price}>Rs. {parking.price}</Text>
     </Pressable>
   );
 }
 
 function ParkingDetailsScreen({ route, navigation }) {
-  const parking = route.params?.parking || parkingData[0];
-  const { favourites, toggleFavourite } = useAppData();
-  const isFavourite = favourites.some((item) => item.id === parking.id);
+  const parking = route.params?.parking;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -214,27 +329,12 @@ function ParkingDetailsScreen({ route, navigation }) {
       <Text style={styles.pageTitle}>{parking.name}</Text>
       <Text style={styles.description}>{parking.location}</Text>
 
-      <View style={styles.detailRow}>
-        <Stat value={`Rs.${parking.price}`} label="Per hour" />
-        <Stat value={parking.available} label="Available" />
-        <Stat value={parking.distance} label="Distance" />
-      </View>
-
       <View style={styles.infoCard}>
-        <Text style={styles.infoTitle}>Facilities</Text>
-        <Text style={styles.infoText}>✓ 24-hour security</Text>
+        <Text style={styles.infoText}>Rs. {parking.price} per hour</Text>
+        <Text style={styles.infoText}>{parking.available} slots available</Text>
+        <Text style={styles.infoText}>✓ Security available</Text>
         <Text style={styles.infoText}>✓ CCTV monitoring</Text>
-        <Text style={styles.infoText}>✓ Easy entrance and exit</Text>
       </View>
-
-      <Pressable
-        style={styles.secondaryButton}
-        onPress={() => toggleFavourite(parking)}
-      >
-        <Text style={styles.secondaryButtonText}>
-          {isFavourite ? '♥ Remove from favourites' : '♡ Add to favourites'}
-        </Text>
-      </Pressable>
 
       <Pressable
         style={styles.primaryButton}
@@ -247,21 +347,16 @@ function ParkingDetailsScreen({ route, navigation }) {
 }
 
 function BookParkingScreen({ route }) {
-  const parking = route.params?.parking || parkingData[0];
+  const parking = route.params?.parking;
   const { addBooking } = useAppData();
   const [vehicle, setVehicle] = useState('');
   const [duration, setDuration] = useState('');
   const [saved, setSaved] = useState(false);
 
   function confirmBooking() {
-    if (!vehicle.trim() || !duration.trim()) return;
+    if (!vehicle || !duration) return;
 
-    addBooking({
-      ...parking,
-      vehicle,
-      duration,
-    });
-
+    addBooking({ ...parking, vehicle, duration });
     setSaved(true);
   }
 
@@ -308,11 +403,10 @@ function MyBookingsScreen() {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.label}>YOUR ACTIVITY</Text>
       <Text style={styles.pageTitle}>My Bookings</Text>
 
       {bookings.length === 0 ? (
-        <Empty title="No bookings yet" text="Your saved bookings will appear here." />
+        <Text style={styles.description}>No bookings yet.</Text>
       ) : (
         bookings.map((booking) => (
           <View key={booking.id} style={styles.infoCard}>
@@ -320,7 +414,6 @@ function MyBookingsScreen() {
             <Text style={styles.infoText}>{booking.location}</Text>
             <Text style={styles.infoText}>Vehicle: {booking.vehicle}</Text>
             <Text style={styles.infoText}>Duration: {booking.duration}</Text>
-            <Text style={styles.muted}>{booking.bookedAt}</Text>
           </View>
         ))
       )}
@@ -333,31 +426,20 @@ function FavouritesScreen({ navigation }) {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.label}>SAVED PLACES</Text>
       <Text style={styles.pageTitle}>Favourites</Text>
 
-      {favourites.length === 0 ? (
-        <Empty title="No favourites yet" text="Save locations for quick access." />
-      ) : (
-        favourites.map((parking) => (
-          <ParkingCard
-            key={parking.id}
-            parking={parking}
-            onPress={() => navigation.navigate('ParkingDetails', { parking })}
-          />
-        ))
+      {favourites.map((parking) => (
+        <ParkingCard
+          key={parking.id}
+          parking={parking}
+          onPress={() => navigation.navigate('ParkingDetails', { parking })}
+        />
+      ))}
+
+      {favourites.length === 0 && (
+        <Text style={styles.description}>No favourites yet.</Text>
       )}
     </ScrollView>
-  );
-}
-
-function Empty({ title, text }) {
-  return (
-    <View style={styles.empty}>
-      <Text style={styles.emptyIcon}>♡</Text>
-      <Text style={styles.emptyTitle}>{title}</Text>
-      <Text style={styles.emptyText}>{text}</Text>
-    </View>
   );
 }
 
@@ -365,26 +447,51 @@ function AboutScreen() {
   return (
     <View style={styles.screen}>
       <View style={styles.content}>
-        <Text style={styles.label}>ABOUT THE APP</Text>
-        <Text style={styles.pageTitle}>ParkSmart</Text>
+        <Text style={styles.pageTitle}>About ParkSmart</Text>
         <Text style={styles.description}>
-          ParkSmart helps drivers find and manage parking locations using
-          locally stored data. The app works without an internet connection.
+          ParkSmart is an offline parking management app. Drivers can find and
+          book parking, while owners can add and manage their own spaces.
         </Text>
       </View>
     </View>
   );
 }
 
+function Stat({ value, label }) {
+  return (
+    <View style={styles.stat}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function Action({ title, icon, onPress }) {
+  return (
+    <Pressable style={styles.action} onPress={onPress}>
+      <Text style={styles.actionIcon}>{icon}</Text>
+      <Text style={styles.actionTitle}>{title}</Text>
+    </Pressable>
+  );
+}
+
+
+
 export default function App() {
+  const [role, setRoleState] = useState('driver');
+  const [parkingSpots, setParkingSpots] = useState(defaultParking);
   const [bookings, setBookings] = useState([]);
   const [favourites, setFavourites] = useState([]);
 
   useEffect(() => {
     async function loadData() {
+      const savedRole = await AsyncStorage.getItem('parkSmartRole');
+      const savedParking = await AsyncStorage.getItem('parkSmartParking');
       const savedBookings = await AsyncStorage.getItem('parkSmartBookings');
       const savedFavourites = await AsyncStorage.getItem('parkSmartFavourites');
 
+      if (savedRole) setRoleState(savedRole);
+      if (savedParking) setParkingSpots(JSON.parse(savedParking));
       if (savedBookings) setBookings(JSON.parse(savedBookings));
       if (savedFavourites) setFavourites(JSON.parse(savedFavourites));
     }
@@ -393,50 +500,64 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    AsyncStorage.setItem('parkSmartRole', role);
+    AsyncStorage.setItem('parkSmartParking', JSON.stringify(parkingSpots));
     AsyncStorage.setItem('parkSmartBookings', JSON.stringify(bookings));
-  }, [bookings]);
-
-  useEffect(() => {
     AsyncStorage.setItem('parkSmartFavourites', JSON.stringify(favourites));
-  }, [favourites]);
+  }, [role, parkingSpots, bookings, favourites]);
 
-  function addBooking(parking) {
-    const booking = {
-      id: Date.now().toString(),
-      parkingName: parking.name,
-      location: parking.location,
-      price: parking.price,
-      vehicle: parking.vehicle,
-      duration: parking.duration,
-      bookedAt: new Date().toLocaleString(),
-    };
-
-    setBookings((current) => [booking, ...current]);
+  function setRole(newRole) {
+    setRoleState(newRole);
   }
 
-  function toggleFavourite(parking) {
-    setFavourites((current) => {
-      const exists = current.some((item) => item.id === parking.id);
+  function addParking(parking) {
+    setParkingSpots((current) => [
+      ...current,
+      {
+        ...parking,
+        id: Date.now(),
+      },
+    ]);
+  }
 
-      return exists
-        ? current.filter((item) => item.id !== parking.id)
-        : [...current, parking];
-    });
+  function addBooking(parking) {
+    setBookings((current) => [
+      {
+        id: Date.now(),
+        parkingName: parking.name,
+        location: parking.location,
+        vehicle: parking.vehicle,
+        duration: parking.duration,
+        bookedAt: new Date().toLocaleString(),
+      },
+      ...current,
+    ]);
   }
 
   return (
-    <AppContext.Provider value={{ bookings, favourites, addBooking, toggleFavourite }}>
+    <AppContext.Provider
+      value={{
+        role,
+        setRole,
+        parkingSpots,
+        addParking,
+        bookings,
+        addBooking,
+        favourites,
+      }}
+    >
       <SafeAreaProvider>
         <NavigationContainer>
           <Stack.Navigator
             screenOptions={{
               headerStyle: { backgroundColor: '#102A56' },
               headerTintColor: '#FFFFFF',
-              headerTitleStyle: { fontWeight: '700' },
               contentStyle: { backgroundColor: '#F5F7FB' },
             }}
           >
             <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'ParkSmart' }} />
+            <Stack.Screen name="Role" component={RoleScreen} options={{ title: 'Switch Role' }} />
+            <Stack.Screen name="AddParking" component={AddParkingScreen} options={{ title: 'Add Parking' }} />
             <Stack.Screen name="FindParking" component={FindParkingScreen} options={{ title: 'Find Parking' }} />
             <Stack.Screen name="ParkingDetails" component={ParkingDetailsScreen} options={{ title: 'Details' }} />
             <Stack.Screen name="BookParking" component={BookParkingScreen} options={{ title: 'Booking' }} />
@@ -459,42 +580,55 @@ const styles = StyleSheet.create({
     padding: 24,
     marginBottom: 16,
   },
+  ownerHero: {
+    backgroundColor: '#7C3AED',
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 18,
+  },
   smallLight: {
-    color: '#9DBAE5',
+    color: '#D9E7FA',
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.5,
   },
   heroTitle: {
     color: '#FFFFFF',
-    fontSize: 34,
+    fontSize: 30,
     fontWeight: '800',
-    marginTop: 6,
+    marginTop: 7,
   },
   heroText: {
     color: '#D9E7FA',
-    fontSize: 17,
-    marginTop: 22,
+    fontSize: 16,
+    marginTop: 20,
     marginBottom: 20,
+    lineHeight: 23,
   },
   heroButton: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
     padding: 15,
+    borderRadius: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   heroButtonText: { color: '#102A56', fontWeight: '800' },
   arrow: { color: '#2563EB', fontSize: 22 },
+  switchButton: {
+    backgroundColor: '#E8F0FF',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  switchText: { color: '#2563EB', fontWeight: '800' },
   statsRow: { flexDirection: 'row', marginBottom: 24 },
   stat: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
     padding: 14,
+    borderRadius: 14,
     marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#E5EAF2',
   },
   statValue: { color: '#102A56', fontSize: 20, fontWeight: '800' },
   statLabel: { color: '#718096', fontSize: 11, marginTop: 4 },
@@ -511,8 +645,6 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     padding: 17,
     marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#E5EAF2',
   },
   actionIcon: { color: '#2563EB', fontSize: 25, marginBottom: 10 },
   actionTitle: { color: '#102A56', fontWeight: '800' },
@@ -521,29 +653,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.5,
-    marginBottom: 7,
+    marginBottom: 8,
   },
   pageTitle: {
     color: '#102A56',
     fontSize: 29,
     fontWeight: '800',
-    marginBottom: 8,
+    marginBottom: 10,
   },
-  description: {
-    color: '#718096',
-    fontSize: 15,
-    lineHeight: 23,
-    marginBottom: 20,
-  },
-  searchInput: {
+  description: { color: '#718096', fontSize: 15, lineHeight: 23 },
+  roleCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 13,
-    padding: 15,
-    color: '#102A56',
-    borderWidth: 1,
-    borderColor: '#E5EAF2',
-    marginBottom: 24,
+    borderRadius: 18,
+    padding: 22,
+    marginBottom: 16,
   },
+  roleIcon: { fontSize: 35, marginBottom: 12 },
+  roleTitle: { color: '#102A56', fontSize: 18, fontWeight: '800' },
   parkingCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 17,
@@ -551,8 +677,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5EAF2',
   },
   parkingIcon: {
     width: 46,
@@ -564,68 +688,54 @@ const styles = StyleSheet.create({
   },
   parkingIconText: { color: '#FFFFFF', fontSize: 21, fontWeight: '900' },
   parkingInfo: { flex: 1 },
-  parkingName: { color: '#102A56', fontWeight: '800', fontSize: 15 },
+  parkingName: { color: '#102A56', fontWeight: '800' },
   muted: { color: '#718096', fontSize: 12, marginTop: 4 },
   available: { color: '#059669', fontSize: 11, marginTop: 8 },
-  price: { color: '#102A56', fontWeight: '800', fontSize: 13 },
+  price: { color: '#102A56', fontWeight: '800' },
+  searchInput: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 13,
+    padding: 15,
+    marginBottom: 22,
+    color: '#102A56',
+  },
   banner: {
-    height: 150,
+    height: 145,
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 22,
   },
   bannerIcon: { color: '#FFFFFF', fontSize: 52, fontWeight: '900' },
-  bannerText: { color: '#FFFFFF', fontSize: 11, fontWeight: '800' },
-  detailRow: { flexDirection: 'row', marginVertical: 14 },
+  bannerText: { color: '#FFFFFF', fontWeight: '800' },
   infoCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 18,
     marginBottom: 16,
   },
-  infoTitle: { color: '#102A56', fontSize: 17, fontWeight: '800', marginBottom: 10 },
-  infoText: { color: '#526176', fontSize: 14, marginTop: 8 },
-  primaryButton: {
-    backgroundColor: '#2563EB',
-    borderRadius: 14,
-    padding: 17,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  primaryButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 15 },
-  secondaryButton: {
-    backgroundColor: '#E8F0FF',
-    borderRadius: 14,
-    padding: 17,
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  secondaryButtonText: { color: '#2563EB', fontWeight: '800' },
+  infoTitle: { color: '#102A56', fontSize: 17, fontWeight: '800' },
+  infoText: { color: '#526176', marginTop: 9 },
   bookingBox: {
     backgroundColor: '#E8F0FF',
     borderRadius: 16,
     padding: 18,
-    marginBottom: 24,
+    marginBottom: 22,
   },
   formLabel: { color: '#102A56', fontWeight: '800', marginBottom: 8 },
   input: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5EAF2',
     padding: 15,
     color: '#102A56',
     marginBottom: 18,
   },
-  empty: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 30,
+  primaryButton: {
+    backgroundColor: '#2563EB',
+    padding: 17,
+    borderRadius: 14,
     alignItems: 'center',
-    marginTop: 14,
+    marginBottom: 16,
   },
-  emptyIcon: { color: '#2563EB', fontSize: 42, marginBottom: 12 },
-  emptyTitle: { color: '#102A56', fontSize: 17, fontWeight: '800' },
-  emptyText: { color: '#718096', textAlign: 'center', marginTop: 8 },
+  primaryButtonText: { color: '#FFFFFF', fontWeight: '800', fontSize: 15 },
 });
